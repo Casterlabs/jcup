@@ -23,10 +23,10 @@ import xyz.e3ndr.fastloggingframework.logging.FastLogger;
 public class ArchiveExtractor {
     private static final FastLogger LOGGER = Main.LOGGER.createChild("ArchiveExtractor");
 
-    public static void extract(Archives.Format format, File archiveFile, File destFile) throws FileNotFoundException, IOException {
-        destFile.mkdirs();
+    public static void extract(Archives.Format format, File archiveFile, File destDir) throws FileNotFoundException, IOException {
+        destDir.mkdirs();
 
-        LOGGER.info("Extracting %s to %s.", archiveFile, destFile);
+        LOGGER.info("Extracting %s to %s.", archiveFile, destDir);
         switch (format) {
             // These are not seekable and thus use a stream implementation.
 
@@ -37,7 +37,7 @@ public class ArchiveExtractor {
                     TarArchiveInputStream ain = new TarArchiveInputStream(gzin)) {
                     ArchiveEntry entry = null;
                     while ((entry = ain.getNextEntry()) != null) {
-                        File newFile = shouldExtract(destFile, entry);
+                        File newFile = shouldExtract(destDir, entry);
                         if (newFile == null) continue;
 
                         extract(newFile, ain);
@@ -52,7 +52,7 @@ public class ArchiveExtractor {
                     TarArchiveInputStream ain = new TarArchiveInputStream(xzin)) {
                     ArchiveEntry entry = null;
                     while ((entry = ain.getNextEntry()) != null) {
-                        File newFile = shouldExtract(destFile, entry);
+                        File newFile = shouldExtract(destDir, entry);
                         if (newFile == null) continue;
 
                         extract(newFile, ain);
@@ -66,7 +66,7 @@ public class ArchiveExtractor {
                     TarArchiveInputStream ain = new TarArchiveInputStream(fin)) {
                     ArchiveEntry entry = null;
                     while ((entry = ain.getNextEntry()) != null) {
-                        File newFile = shouldExtract(destFile, entry);
+                        File newFile = shouldExtract(destDir, entry);
                         if (newFile == null) continue;
 
                         extract(newFile, ain);
@@ -79,7 +79,7 @@ public class ArchiveExtractor {
             case _7ZIP:
                 try (SevenZFile archive = new SevenZFile(archiveFile)) {
                     for (SevenZArchiveEntry entry : archive.getEntries()) {
-                        File newFile = shouldExtract(destFile, entry);
+                        File newFile = shouldExtract(destDir, entry);
                         if (newFile == null) continue;
 
                         try (InputStream in = archive.getInputStream(entry)) {
@@ -92,7 +92,7 @@ public class ArchiveExtractor {
             case ZIP:
                 try (ZipFile archive = new ZipFile(archiveFile)) {
                     for (ZipArchiveEntry entry : Collections.list(archive.getEntries())) {
-                        File newFile = shouldExtract(destFile, entry);
+                        File newFile = shouldExtract(destDir, entry);
                         if (newFile == null) continue;
 
                         try (InputStream in = archive.getInputStream(entry)) {
