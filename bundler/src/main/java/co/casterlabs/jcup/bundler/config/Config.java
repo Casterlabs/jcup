@@ -22,8 +22,48 @@ public class Config {
 
     public OSSpecificConfig[] toCreate = {
             new OSSpecificConfig(
-                OperatingSystem.values(),
-                Architecture.values(),
+                new OperatingSystem[] {
+                        OperatingSystem.windows,
+                        OperatingSystem.macosx
+                },
+                new Architecture[] {
+                        Architecture.x86
+                },
+                null,
+                Collections.emptyMap()
+            ),
+            new OSSpecificConfig(
+                new OperatingSystem[] {
+                        OperatingSystem.linux_glibc,
+                        OperatingSystem.linux_musl,
+                        OperatingSystem.windows,
+                        OperatingSystem.macosx
+                },
+                new Architecture[] {
+                        Architecture.x86_64
+                },
+                null,
+                Collections.emptyMap()
+            ),
+            new OSSpecificConfig(
+                new OperatingSystem[] {
+                        OperatingSystem.linux_glibc,
+                        OperatingSystem.linux_musl,
+                        OperatingSystem.macosx
+                },
+                new Architecture[] {
+                        Architecture.aarch64
+                },
+                null,
+                Collections.emptyMap()
+            ),
+            new OSSpecificConfig(
+                new OperatingSystem[] {
+                        OperatingSystem.linux_glibc
+                },
+                new Architecture[] {
+                        Architecture.arm
+                },
                 null,
                 Collections.emptyMap()
             )
