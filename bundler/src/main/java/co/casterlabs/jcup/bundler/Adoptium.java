@@ -83,7 +83,7 @@ public class Adoptium {
         LOGGER.debug("Url: %s, Path: %s", binaryUrl, binaryPath);
 
         if (binaryPath.toFile().exists()) {
-            LOGGER.info("This VM build is cached. Using that instead.");
+            LOGGER.info("This JRE build is cached. Using that instead.");
         } else {
             LOGGER.info("Found a link. Downloading...");
 
