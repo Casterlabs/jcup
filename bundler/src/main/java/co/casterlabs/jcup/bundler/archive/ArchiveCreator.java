@@ -25,7 +25,7 @@ public class ArchiveCreator {
             case ZIP: {
                 try (
                     OutputStream fileOut = new FileOutputStream(destFile);
-                    ArchiveOutputStream out = new ZipArchiveOutputStream(fileOut)) {
+                    ZipArchiveOutputStream out = new ZipArchiveOutputStream(fileOut)) {
                     compress(inputDir, inputDir, out);
                     out.finish();
                 }
@@ -33,13 +33,32 @@ public class ArchiveCreator {
             }
 
             case TAR_GZ: {
-                try (
-                    OutputStream fileOut = new FileOutputStream(destFile);
-                    OutputStream gzipOut = new GzipCompressorOutputStream(fileOut);
-                    ArchiveOutputStream out = new TarArchiveOutputStream(gzipOut)) {
-                    compress(inputDir, inputDir, out);
-                    out.finish();
+                try {
+                    int exitCode = Runtime.getRuntime().exec(new String[] {
+                            "tar",
+                            "-czvf",
+                            destFile.getAbsolutePath(),
+                            "-C",
+                            inputDir.getAbsolutePath(),
+                            "."
+                    })
+                        .waitFor();
+
+                    if (exitCode != 0) {
+                        LOGGER.warn("tar command appears to be unsupported, falling back to java-implementation. THIS WILL DESTROY THE EXECUTABLE BIT.");
+                        try (
+                            OutputStream fileOut = new FileOutputStream(destFile);
+                            OutputStream gzipOut = new GzipCompressorOutputStream(fileOut);
+                            TarArchiveOutputStream out = new TarArchiveOutputStream(gzipOut)) {
+                            out.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+                            compress(inputDir, inputDir, out);
+                            out.finish();
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    throw new IOException(e);
                 }
+
                 return;
             }
 
