@@ -132,7 +132,7 @@ public class Main implements Runnable {
         // Empty these out.
         Utils.deleteRecursively(new File("jcup/build"));
         new File("jcup/build").mkdirs();
-        Utils.deleteRecursively(new File("jcup/build"));
+        Utils.deleteRecursively(new File("jcup/artifacts"));
         new File("jcup/artifacts").mkdirs();
 
         for (OSSpecificConfig ossc : config.toCreate) {
@@ -264,7 +264,7 @@ public class Main implements Runnable {
                             }
 
                             try {
-                                File archiveFile = new File(String.format("jcup/artifacts/%s-%s.tar.gz", os, arch));
+                                File archiveFile = new File(String.format("jcup/artifacts/%s-%s-%s.tar.gz", config.executableName, os, arch));
                                 ArchiveCreator.create(Format.TAR_GZ, buildFolder, archiveFile);
                                 LOGGER.info("Produced artifact: %s", archiveFile.getAbsolutePath());
                             } catch (IOException e) {
@@ -352,7 +352,7 @@ public class Main implements Runnable {
                             }
 
                             try {
-                                File archiveFile = new File(String.format("jcup/artifacts/%s-%s.app.tar.gz", os, arch));
+                                File archiveFile = new File(String.format("jcup/artifacts/%s-%s-%s.app.tar.gz", config.executableName, os, arch));
                                 ArchiveCreator.create(Format.ZIP, new File(String.format("jcup/build/%s-%s", os, arch)), archiveFile);
                                 LOGGER.info("Produced artifact: %s", archiveFile.getAbsolutePath());
                             } catch (IOException e) {
@@ -377,7 +377,7 @@ public class Main implements Runnable {
                             }
 
                             try {
-                                File archiveFile = new File(String.format("jcup/artifacts/%s-%s.tar.gz", os, arch));
+                                File archiveFile = new File(String.format("jcup/artifacts/%s-%s-%s.tar.gz", config.executableName, os, arch));
                                 ArchiveCreator.create(Format.ZIP, buildFolder, archiveFile);
                                 LOGGER.info("Produced artifact: %s", archiveFile.getAbsolutePath());
                             } catch (IOException e) {
