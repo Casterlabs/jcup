@@ -9,12 +9,14 @@ import lombok.NoArgsConstructor;
 @JsonClass(exposeAll = true)
 public class Config {
     public String executableName = "MyApp";
+    public String appIconPath = null;
+
     public String vmArgs = "-Xms1M -jar MyApp.jar";
+    public int javaVersion = 17;
+
     public String[] mainInclude = {
             "MyApp.jar"
     };
-    public String appIconPath = null;
-    public int javaVersion = 17;
 
     public Map<OperatingSystem, OSSpecificConfig> toCreate = Map.of(
         OperatingSystem.windows,
@@ -31,6 +33,7 @@ public class Config {
     @JsonClass(exposeAll = true)
     public static class OSSpecificConfig {
         public Architecture[] architectures = {};
+
         public String[] extraInclude = {};
     }
 
