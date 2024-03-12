@@ -85,7 +85,7 @@ int main(int argc, char **argv)
 {
     str_builder_t *command = str_builder_create();
 
-    str_builder_add_str(command, "java", 0);
+    str_builder_add_str(command, "runtime/bin/java.exe", 0);
 
     // Look for a vmargs.txt, if it exists then append it to the string builder.
     {
