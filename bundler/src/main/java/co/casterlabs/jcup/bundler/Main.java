@@ -4,11 +4,13 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map.Entry;
 
 import co.casterlabs.jcup.bundler.archive.ArchiveExtractor;
 import co.casterlabs.jcup.bundler.archive.Archives;
 import co.casterlabs.jcup.bundler.config.Architecture;
 import co.casterlabs.jcup.bundler.config.Config;
+import co.casterlabs.jcup.bundler.config.Config.OSSpecificConfig;
 import co.casterlabs.jcup.bundler.config.OperatingSystem;
 import co.casterlabs.rakurai.json.Rson;
 import lombok.Getter;
@@ -117,16 +119,40 @@ public class Main implements Runnable {
             LOGGER.warn("Unable to rewrite config. Do we have permission to write? Ignoring.\n%s", e);
         }
 
-        try {
-            Path archive = Adoptium.download(Path.of("jcup/download-cache"), 8, Architecture.x86_64, OperatingSystem.windows);
+        for (Entry<OperatingSystem, OSSpecificConfig> entry : config.toCreate.entrySet()) {
+            OperatingSystem os = entry.getKey();
+            OSSpecificConfig ossc = entry.getValue();
 
-            ArchiveExtractor.extract(
-                Archives.probeFormat(archive.toString()),
-                archive.toFile(),
-                new File("jcup/test/vm")
-            );
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
+            for (Architecture arch : ossc.architectures) {
+                try {
+                    Path archive = Adoptium.download(Path.of("jcup/download-cache"), 8, Architecture.x86_64, OperatingSystem.windows);
+                    File buildFolder = new File(String.format("jcup/build/%s-%s", os, arch));
+                    File runtimeFolder = new File(buildFolder, "runtime");
+                    Utils.deleteRecursively(buildFolder); // Empty it out.
+
+                    ArchiveExtractor.extract(
+                        Archives.probeFormat(archive.toString()),
+                        archive.toFile(),
+                        runtimeFolder
+                    );
+
+                    if (buildFolder.list().length == 1) {
+                        // It's nested. Let's fix that.
+                        File nestedFolder = runtimeFolder.listFiles()[0];
+                        LOGGER.debug("Reorganizing the VM files.");
+                        for (File nestedFolderChild : nestedFolder.listFiles()) {
+                            nestedFolderChild.renameTo(new File(runtimeFolder, nestedFolderChild.getName()));
+                        }
+                        nestedFolder.delete();
+                    }
+
+                    Utils.deleteRecursively(new File(buildFolder, "man")); // Delete any manpages.
+
+                    // TODO includes. Also add the natives.
+                } catch (IOException | InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
 
