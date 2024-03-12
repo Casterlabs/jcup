@@ -1,9 +1,10 @@
 package co.casterlabs.jcup.bundler.config;
 
-import java.util.HashMap;
 import java.util.Map;
 
 import co.casterlabs.rakurai.json.annotating.JsonClass;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 @JsonClass(exposeAll = true)
 public class Config {
@@ -14,8 +15,18 @@ public class Config {
     };
     public String appIconPath = null;
 
-    public Map<OperatingSystem, OSSpecificConfig> toCreate = new HashMap<>();
+    public Map<OperatingSystem, OSSpecificConfig> toCreate = Map.of(
+        OperatingSystem.windows,
+        new OSSpecificConfig(
+            new Architecture[] {
+                    Architecture.x86_64
+            },
+            new String[0]
+        )
+    );
 
+    @NoArgsConstructor
+    @AllArgsConstructor
     @JsonClass(exposeAll = true)
     public static class OSSpecificConfig {
         public Architecture[] architectures = {};
