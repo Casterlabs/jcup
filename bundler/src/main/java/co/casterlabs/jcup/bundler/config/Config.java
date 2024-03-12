@@ -1,5 +1,6 @@
 package co.casterlabs.jcup.bundler.config;
 
+import java.util.Collections;
 import java.util.Map;
 
 import co.casterlabs.rakurai.json.annotating.JsonClass;
@@ -9,22 +10,22 @@ import lombok.NoArgsConstructor;
 @JsonClass(exposeAll = true)
 public class Config {
     public String executableName = "MyApp";
+    public String executableId = "co.casterlabs.jcup.example_app";
     public String appIconPath = null;
 
-    public String vmArgs = "-Xms1M -jar MyApp.jar";
+    public String vmArgs = "-Xms1M -jar jcup-example-app.jar";
     public int javaVersion = 17;
 
     public Map<String, String> mainInclude = Map.of(
-        "MyApp.jar", "MyApp.jar"
+        "jcup-example-app.jar", "jcup-example-app.jar"
     );
 
     public OSSpecificConfig[] toCreate = {
             new OSSpecificConfig(
                 OperatingSystem.values(),
                 Architecture.values(),
-                Map.of(
-                    "MyApp.jar", "MyApp.jar"
-                )
+                null,
+                Collections.emptyMap()
             )
     };
 
@@ -35,6 +36,7 @@ public class Config {
         public OperatingSystem[] operatingSystems;
         public Architecture[] architectures;
 
+        public String extraVmArgs;
         public Map<String, String> extraInclude;
     }
 

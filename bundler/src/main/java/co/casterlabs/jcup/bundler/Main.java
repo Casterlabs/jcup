@@ -9,8 +9,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map.Entry;
 
+import co.casterlabs.commons.platform.OSDistribution;
+import co.casterlabs.commons.platform.Platform;
+import co.casterlabs.jcup.bundler.archive.ArchiveCreator;
 import co.casterlabs.jcup.bundler.archive.ArchiveExtractor;
 import co.casterlabs.jcup.bundler.archive.Archives;
+import co.casterlabs.jcup.bundler.archive.Archives.Format;
 import co.casterlabs.jcup.bundler.config.Architecture;
 import co.casterlabs.jcup.bundler.config.Config;
 import co.casterlabs.jcup.bundler.config.Config.OSSpecificConfig;
@@ -66,6 +70,9 @@ public class Main implements Runnable {
         if (this.disableColor) {
             FastLoggingFramework.setColorEnabled(false);
             LOGGER.info("Disabled colored log output.");
+        } else {
+            FastLoggingFramework.setColorEnabled(true);
+            LOGGER.info("Enabled colored log output.");
         }
 
         if (this.enableTraceLogging) {
@@ -122,12 +129,18 @@ public class Main implements Runnable {
             LOGGER.warn("Unable to rewrite config. Do we have permission to write? Ignoring.\n%s", e);
         }
 
+        // Empty these out.
+        Utils.deleteRecursively(new File("jcup/build"));
+        new File("jcup/build").mkdirs();
+        Utils.deleteRecursively(new File("jcup/build"));
+        new File("jcup/artifacts").mkdirs();
+
         for (OSSpecificConfig ossc : config.toCreate) {
             for (OperatingSystem os : ossc.operatingSystems) {
                 for (Architecture arch : ossc.architectures) {
                     Path archive;
                     try {
-                        archive = Adoptium.download(Path.of("jcup/download-cache"), 8, Architecture.x86_64, OperatingSystem.windows);
+                        archive = Adoptium.download(Path.of("jcup/download-cache"), config.javaVersion, arch, os);
                     } catch (IllegalArgumentException e) {
                         LOGGER.warn("Unsupported build target, ignoring.\n%s", e);
                         continue;
@@ -137,8 +150,8 @@ public class Main implements Runnable {
                         return;
                     }
 
-                    File buildFolder = new File(String.format("jcup/build/%s-%s", os, arch));
-                    File runtimeFolder = new File(buildFolder, "runtime");
+                    File buildFolder = new File(String.format("jcup/build/%s-%s/%s", os, arch, os == OperatingSystem.macosx ? config.executableName + ".app" : "")); // Also add .app extension if for macos.
+                    File runtimeFolder = os == OperatingSystem.macosx ? buildFolder : new File(buildFolder, "runtime");
                     Utils.deleteRecursively(buildFolder); // Empty it out.
 
                     try {
@@ -153,17 +166,34 @@ public class Main implements Runnable {
                         return;
                     }
 
-                    if (buildFolder.list().length == 1) {
-                        // It's nested. Let's fix that.
-                        File nestedFolder = runtimeFolder.listFiles()[0];
-                        LOGGER.debug("Reorganizing the VM files.");
-                        for (File nestedFolderChild : nestedFolder.listFiles()) {
-                            nestedFolderChild.renameTo(new File(runtimeFolder, nestedFolderChild.getName()));
+                    try {
+                        if (buildFolder.list().length == 1) {
+                            // It's nested. Let's fix that.
+                            File nestedFolder = runtimeFolder.listFiles()[0];
+                            LOGGER.debug("Reorganizing the VM files.");
+                            for (File nestedFolderChild : nestedFolder.listFiles()) {
+                                Files.move(nestedFolderChild.toPath(), new File(runtimeFolder, nestedFolderChild.getName()).toPath());
+                            }
+                            nestedFolder.delete();
                         }
-                        nestedFolder.delete();
+
+                        if (os == OperatingSystem.macosx) {
+                            // We need to rearrange some files.
+                            File newBuildFolder = new File(buildFolder, "Contents/Resources");
+                            Files.createDirectories(newBuildFolder.toPath());
+                            Files.move(new File(buildFolder, "Contents/Home").toPath(), new File(buildFolder, "Contents/Resources/runtime").toPath());
+                            buildFolder = newBuildFolder;
+                        }
+                    } catch (IOException e) {
+                        LOGGER.fatal("Unable to move JRE files, aborting.\n%s", e);
+                        System.exit(EXIT_CODE_ERROR);
+                        return;
                     }
 
-                    Utils.deleteRecursively(new File(buildFolder, "man")); // Delete any manpages.
+                    Utils.deleteRecursively(new File(runtimeFolder, "man")); // Delete any manpages.
+                    Utils.deleteRecursively(new File(runtimeFolder, "Contents/Resources/man")); // Delete any manpages.
+                    Utils.deleteRecursively(new File(runtimeFolder, "Contents/_CodeSignature")); // Delete any code signatures.
+                    Utils.deleteRecursively(new File(runtimeFolder, "Contents/Info.plist")); // Delete any manifests.
 
                     // Includes.
                     try {
@@ -183,11 +213,25 @@ public class Main implements Runnable {
                         return;
                     }
 
+                    // Create the VM args file.
+                    try {
+                        String vmArgs = config.vmArgs;
+                        if (ossc.extraVmArgs != null && !ossc.extraVmArgs.isEmpty()) {
+                            vmArgs += ' ';
+                            vmArgs += ossc.extraVmArgs;
+                        }
+                        Files.writeString(new File(buildFolder, "vmargs.txt").toPath(), vmArgs);
+                    } catch (IOException e) {
+                        LOGGER.fatal("Unable to write vmargs.txt, aborting.\n%s", e);
+                        System.exit(EXIT_CODE_ERROR);
+                        return;
+                    }
+
                     switch (os) {
                         case linux_glibc:
                         case linux_musl: {
                             // Add the launcher executable.
-                            try (InputStream in = Main.class.getResourceAsStream("/unix-launcher.exe");
+                            try (InputStream in = Main.class.getResourceAsStream("/unix-launcher");
                                 OutputStream out = new FileOutputStream(new File(buildFolder, config.executableName))) {
                                 in.transferTo(out);
                             } catch (IOException e) {
@@ -196,15 +240,47 @@ public class Main implements Runnable {
                                 return;
                             }
 
-                            // TODO zip file.
+                            // Mark files as executable.
+                            final String[] NEED_TO_MARK_EXEC = {
+                                    config.executableName,
+                                    "runtime/bin/java"
+                            };
+
+                            if (Platform.osDistribution == OSDistribution.WINDOWS_NT) {
+                                LOGGER.warn(
+                                    "Windows doesn't support marking files (%s) as executable, this will likely cause problems for your users. I hope you know what you are doing.",
+                                    String.join(", ", NEED_TO_MARK_EXEC)
+                                );
+                            } else {
+                                for (String path : NEED_TO_MARK_EXEC) {
+                                    File file = new File(buildFolder, path);
+                                    if (!file.exists()) continue; // Not applicable.
+                                    if (!file.setExecutable(true)) {
+                                        LOGGER.fatal("Unable to mark %s as executable, aborting.", file);
+                                        System.exit(EXIT_CODE_ERROR);
+                                        return;
+                                    }
+                                }
+                            }
+
+                            try {
+                                File archiveFile = new File(String.format("jcup/artifacts/%s-%s.tar.gz", os, arch));
+                                ArchiveCreator.create(Format.TAR_GZ, buildFolder, archiveFile);
+                                LOGGER.info("Produced artifact: %s", archiveFile.getAbsolutePath());
+                            } catch (IOException e) {
+                                LOGGER.fatal("Unable to create .tar.gz file, aborting.\n%s", e);
+                                System.exit(EXIT_CODE_ERROR);
+                                return;
+                            }
+
                             // TODO .AppImage
                             break;
                         }
 
                         case macosx: {
                             // Add the launcher executable.
-                            try (InputStream in = Main.class.getResourceAsStream("/unix-launcher.exe");
-                                OutputStream out = new FileOutputStream(new File(buildFolder, config.executableName))) {
+                            try (InputStream in = Main.class.getResourceAsStream("/macosx-launcher");
+                                OutputStream out = new FileOutputStream(new File(buildFolder, "../MacOS/" + config.executableName))) {
                                 in.transferTo(out);
                             } catch (IOException e) {
                                 LOGGER.fatal("Unable to copy native executable, aborting.\n%s", e);
@@ -212,7 +288,79 @@ public class Main implements Runnable {
                                 return;
                             }
 
-                            // TODO .app
+                            try {
+                                Files.writeString(
+                                    new File(buildFolder, "../Info.plist").toPath(),
+                                    ("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                                        + "<!DOCTYPE plist PUBLIC \"-//Apple Computer//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+                                        + "<plist version=\"1.0\">\n"
+                                        + "<dict>\n"
+                                        + "  <key>CFBundleGetInfoString</key>\n"
+                                        + "  <string>{name}</string>\n"
+                                        + "  <key>CFBundleExecutable</key>\n"
+                                        + "  <string>{name}</string>\n"
+                                        + "  <key>CFBundleIdentifier</key>\n"
+                                        + "  <string>{id}</string>\n"
+                                        + "  <key>CFBundleName</key>\n"
+                                        + "  <string>{name}</string>\n"
+                                        + "  <key>CFBundleIconFile</key>\n"
+                                        + "  <string>icons.icns</string>\n"
+                                        + "  <key>CFBundleShortVersionString</key>\n"
+                                        + "  <string>1.0</string>\n"
+                                        + "  <key>CFBundleInfoDictionaryVersion</key>\n"
+                                        + "  <string>6.0</string>\n"
+                                        + "  <key>CFBundlePackageType</key>\n"
+                                        + "  <string>APPL</string>\n"
+                                        + "  <key>IFMajorVersion</key>\n"
+                                        + "  <integer>0</integer>\n"
+                                        + "  <key>IFMinorVersion</key>\n"
+                                        + "  <integer>1</integer>\n"
+                                        + "  <key>NSHighResolutionCapable</key>\n"
+                                        + "  <true/>\n"
+                                        + "</dict>\n"
+                                        + "</plist>")
+                                            .replace("{name}", config.executableName)
+                                            .replace("{id}", config.executableId)
+                                );
+                            } catch (IOException e) {
+                                LOGGER.fatal("Unable to write Info.plist, aborting.\n%s", e);
+                                System.exit(EXIT_CODE_ERROR);
+                                return;
+                            }
+
+                            // Mark files as executable.
+                            final String[] NEED_TO_MARK_EXEC = {
+                                    "Contents/MacOS" + config.executableName,
+                                    "Contents/Resources/runtime/bin/java"
+                            };
+
+                            if (Platform.osDistribution == OSDistribution.WINDOWS_NT) {
+                                LOGGER.warn(
+                                    "Windows doesn't support marking files (%s) as executable, this will likely cause problems for your users. I hope you know what you are doing.",
+                                    String.join(", ", NEED_TO_MARK_EXEC)
+                                );
+                            } else {
+                                for (String path : NEED_TO_MARK_EXEC) {
+                                    File file = new File(buildFolder, path);
+                                    if (!file.exists()) continue; // Not applicable.
+                                    if (!file.setExecutable(true)) {
+                                        LOGGER.fatal("Unable to mark %s as executable, aborting.", file);
+                                        System.exit(EXIT_CODE_ERROR);
+                                        return;
+                                    }
+                                }
+                            }
+
+                            try {
+                                File archiveFile = new File(String.format("jcup/artifacts/%s-%s.app.tar.gz", os, arch));
+                                ArchiveCreator.create(Format.ZIP, new File(String.format("jcup/build/%s-%s", os, arch)), archiveFile);
+                                LOGGER.info("Produced artifact: %s", archiveFile.getAbsolutePath());
+                            } catch (IOException e) {
+                                LOGGER.fatal("Unable to create .zip file, aborting.\n%s", e);
+                                System.exit(EXIT_CODE_ERROR);
+                                return;
+                            }
+
                             // TODO .pkg installer.
                             break;
                         }
@@ -228,7 +376,16 @@ public class Main implements Runnable {
                                 return;
                             }
 
-                            // TODO zip file.
+                            try {
+                                File archiveFile = new File(String.format("jcup/artifacts/%s-%s.tar.gz", os, arch));
+                                ArchiveCreator.create(Format.ZIP, buildFolder, archiveFile);
+                                LOGGER.info("Produced artifact: %s", archiveFile.getAbsolutePath());
+                            } catch (IOException e) {
+                                LOGGER.fatal("Unable to create .zip file, aborting.\n%s", e);
+                                System.exit(EXIT_CODE_ERROR);
+                                return;
+                            }
+
                             // TODO msi installer.
                             break;
                         }

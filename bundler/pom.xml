@@ -109,6 +109,12 @@
 			<scope>compile</scope>
 		</dependency>
 		<dependency>
+			<groupId>co.casterlabs.commons</groupId>
+			<artifactId>platform</artifactId>
+			<version>1.6.0</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
 			<groupId>com.github.e3ndr</groupId>
 			<artifactId>FastLoggingFramework</artifactId>
 			<version>1.12.1</version>
