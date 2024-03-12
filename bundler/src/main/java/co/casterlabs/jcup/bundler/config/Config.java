@@ -14,27 +14,28 @@ public class Config {
     public String vmArgs = "-Xms1M -jar MyApp.jar";
     public int javaVersion = 17;
 
-    public String[] mainInclude = {
-            "MyApp.jar"
-    };
-
-    public Map<OperatingSystem, OSSpecificConfig> toCreate = Map.of(
-        OperatingSystem.windows,
-        new OSSpecificConfig(
-            new Architecture[] {
-                    Architecture.x86_64
-            },
-            new String[0]
-        )
+    public Map<String, String> mainInclude = Map.of(
+        "MyApp.jar", "MyApp.jar"
     );
+
+    public OSSpecificConfig[] toCreate = {
+            new OSSpecificConfig(
+                OperatingSystem.values(),
+                Architecture.values(),
+                Map.of(
+                    "MyApp.jar", "MyApp.jar"
+                )
+            )
+    };
 
     @NoArgsConstructor
     @AllArgsConstructor
     @JsonClass(exposeAll = true)
     public static class OSSpecificConfig {
-        public Architecture[] architectures = {};
+        public OperatingSystem[] operatingSystems;
+        public Architecture[] architectures;
 
-        public String[] extraInclude = {};
+        public Map<String, String> extraInclude;
     }
 
 }
