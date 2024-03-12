@@ -352,7 +352,7 @@ public class Main implements Runnable {
 
                             try {
                                 File archiveFile = new File(String.format("jcup/artifacts/%s-%s-%s.app.tar.gz", config.executableName, os, arch));
-                                ArchiveCreator.create(Format.ZIP, new File(String.format("jcup/build/%s-%s", os, arch)), archiveFile);
+                                ArchiveCreator.create(Format.TAR_GZ, new File(String.format("jcup/build/%s-%s", os, arch)), archiveFile);
                                 LOGGER.info("Produced artifact: %s", archiveFile.getAbsolutePath());
                             } catch (IOException e) {
                                 LOGGER.fatal("Unable to create .zip file, aborting.\n%s", e);
