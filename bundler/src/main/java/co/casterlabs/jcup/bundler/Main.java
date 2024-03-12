@@ -1,7 +1,10 @@
 package co.casterlabs.jcup.bundler;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map.Entry;
@@ -119,22 +122,36 @@ public class Main implements Runnable {
             LOGGER.warn("Unable to rewrite config. Do we have permission to write? Ignoring.\n%s", e);
         }
 
-        for (Entry<OperatingSystem, OSSpecificConfig> entry : config.toCreate.entrySet()) {
-            OperatingSystem os = entry.getKey();
-            OSSpecificConfig ossc = entry.getValue();
+        for (OSSpecificConfig ossc : config.toCreate) {
+            for (OperatingSystem os : ossc.operatingSystems) {
+                for (Architecture arch : ossc.architectures) {
+                    Path archive;
+                    try {
+                        archive = Adoptium.download(Path.of("jcup/download-cache"), 8, Architecture.x86_64, OperatingSystem.windows);
+                    } catch (IllegalArgumentException e) {
+                        LOGGER.warn("Unsupported build target, ignoring.\n%s", e);
+                        continue;
+                    } catch (IOException | InterruptedException e) {
+                        LOGGER.fatal("Unable to download JRE, aborting.\n%s", e);
+                        System.exit(EXIT_CODE_ERROR);
+                        return;
+                    }
 
-            for (Architecture arch : ossc.architectures) {
-                try {
-                    Path archive = Adoptium.download(Path.of("jcup/download-cache"), 8, Architecture.x86_64, OperatingSystem.windows);
                     File buildFolder = new File(String.format("jcup/build/%s-%s", os, arch));
                     File runtimeFolder = new File(buildFolder, "runtime");
                     Utils.deleteRecursively(buildFolder); // Empty it out.
 
-                    ArchiveExtractor.extract(
-                        Archives.probeFormat(archive.toString()),
-                        archive.toFile(),
-                        runtimeFolder
-                    );
+                    try {
+                        ArchiveExtractor.extract(
+                            Archives.probeFormat(archive.toString()),
+                            archive.toFile(),
+                            runtimeFolder
+                        );
+                    } catch (IOException e) {
+                        LOGGER.fatal("Unable to extract JRE, aborting.\n%s", e);
+                        System.exit(EXIT_CODE_ERROR);
+                        return;
+                    }
 
                     if (buildFolder.list().length == 1) {
                         // It's nested. Let's fix that.
@@ -148,9 +165,75 @@ public class Main implements Runnable {
 
                     Utils.deleteRecursively(new File(buildFolder, "man")); // Delete any manpages.
 
-                    // TODO includes. Also add the natives.
-                } catch (IOException | InterruptedException e) {
-                    e.printStackTrace();
+                    // Includes.
+                    try {
+                        for (Entry<String, String> entry : config.mainInclude.entrySet()) {
+                            File toIncludeFile = new File(entry.getKey());
+                            File includedFile = new File(buildFolder, entry.getValue());
+                            Files.copy(toIncludeFile.toPath(), includedFile.toPath());
+                        }
+                        for (Entry<String, String> entry : ossc.extraInclude.entrySet()) {
+                            File toIncludeFile = new File(entry.getKey());
+                            File includedFile = new File(buildFolder, entry.getValue());
+                            Files.copy(toIncludeFile.toPath(), includedFile.toPath());
+                        }
+                    } catch (IOException e) {
+                        LOGGER.fatal("Unable to copy `include`'d files, aborting.\n%s", e);
+                        System.exit(EXIT_CODE_ERROR);
+                        return;
+                    }
+
+                    switch (os) {
+                        case linux_glibc:
+                        case linux_musl: {
+                            // Add the launcher executable.
+                            try (InputStream in = Main.class.getResourceAsStream("/unix-launcher.exe");
+                                OutputStream out = new FileOutputStream(new File(buildFolder, config.executableName))) {
+                                in.transferTo(out);
+                            } catch (IOException e) {
+                                LOGGER.fatal("Unable to copy native executable, aborting.\n%s", e);
+                                System.exit(EXIT_CODE_ERROR);
+                                return;
+                            }
+
+                            // TODO zip file.
+                            // TODO .AppImage
+                            break;
+                        }
+
+                        case macosx: {
+                            // Add the launcher executable.
+                            try (InputStream in = Main.class.getResourceAsStream("/unix-launcher.exe");
+                                OutputStream out = new FileOutputStream(new File(buildFolder, config.executableName))) {
+                                in.transferTo(out);
+                            } catch (IOException e) {
+                                LOGGER.fatal("Unable to copy native executable, aborting.\n%s", e);
+                                System.exit(EXIT_CODE_ERROR);
+                                return;
+                            }
+
+                            // TODO .app
+                            // TODO .pkg installer.
+                            break;
+                        }
+
+                        case windows: {
+                            // Add the launcher exe.
+                            try (InputStream in = Main.class.getResourceAsStream("/windows-launcher.exe");
+                                OutputStream out = new FileOutputStream(new File(buildFolder, config.executableName + ".exe"))) {
+                                in.transferTo(out);
+                            } catch (IOException e) {
+                                LOGGER.fatal("Unable to copy native executable, aborting.\n%s", e);
+                                System.exit(EXIT_CODE_ERROR);
+                                return;
+                            }
+
+                            // TODO zip file.
+                            // TODO msi installer.
+                            break;
+                        }
+
+                    }
                 }
             }
         }
