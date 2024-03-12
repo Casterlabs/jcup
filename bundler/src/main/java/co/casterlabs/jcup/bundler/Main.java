@@ -254,7 +254,6 @@ public class Main implements Runnable {
                             } else {
                                 for (String path : NEED_TO_MARK_EXEC) {
                                     File file = new File(buildFolder, path);
-                                    if (!file.exists()) continue; // Not applicable.
                                     if (!file.setExecutable(true)) {
                                         LOGGER.fatal("Unable to mark %s as executable, aborting.", file);
                                         System.exit(EXIT_CODE_ERROR);
@@ -342,7 +341,6 @@ public class Main implements Runnable {
                             } else {
                                 for (String path : NEED_TO_MARK_EXEC) {
                                     File file = new File(buildFolder, path);
-                                    if (!file.exists()) continue; // Not applicable.
                                     if (!file.setExecutable(true)) {
                                         LOGGER.fatal("Unable to mark %s as executable, aborting.", file);
                                         System.exit(EXIT_CODE_ERROR);
