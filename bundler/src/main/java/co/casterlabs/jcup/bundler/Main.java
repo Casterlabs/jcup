@@ -329,8 +329,9 @@ public class Main implements Runnable {
 
                             // Mark files as executable.
                             final String[] NEED_TO_MARK_EXEC = {
-                                    "Contents/MacOS" + config.executableName,
-                                    "Contents/Resources/runtime/bin/java"
+                                    "Contents/MacOS/" + config.executableName,
+                                    "Contents/Resources/runtime/bin/java",
+                                    "../"
                             };
 
                             if (Platform.osDistribution == OSDistribution.WINDOWS_NT) {
@@ -340,7 +341,7 @@ public class Main implements Runnable {
                                 );
                             } else {
                                 for (String path : NEED_TO_MARK_EXEC) {
-                                    File file = new File(buildFolder, path);
+                                    File file = new File(buildFolder, "../../" + path);
                                     if (!file.setExecutable(true)) {
                                         LOGGER.fatal("Unable to mark %s as executable, aborting.", file);
                                         System.exit(EXIT_CODE_ERROR);
