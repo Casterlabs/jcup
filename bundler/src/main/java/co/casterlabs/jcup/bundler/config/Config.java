@@ -14,6 +14,7 @@ public class Config {
             "MyApp.jar"
     };
     public String appIconPath = null;
+    public int javaVersion = 17;
 
     public Map<OperatingSystem, OSSpecificConfig> toCreate = Map.of(
         OperatingSystem.windows,
