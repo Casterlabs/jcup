@@ -80,7 +80,7 @@ public class Main implements Runnable {
                 configFile.toFile().getParentFile().mkdirs();
                 Files.writeString(
                     configFile,
-                    Rson.DEFAULT.toJson(new Config()).toString()
+                    Rson.DEFAULT.toJson(new Config()).toString(true)
                 );
                 Files.writeString(
                     configFile.resolveSibling(".gitignore"),
@@ -112,7 +112,7 @@ public class Main implements Runnable {
             // Update the config.json with any new values/defaults.
             Files.writeString(
                 configFile,
-                Rson.DEFAULT.toJson(config).toString()
+                Rson.DEFAULT.toJson(config).toString(true)
             );
             LOGGER.debug("Rewrote config with any missing parameters.");
         } catch (IOException e) {
