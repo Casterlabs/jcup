@@ -17,11 +17,11 @@ import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream;
 
-import co.casterlabs.jcup.bundler.Main;
+import co.casterlabs.jcup.bundler.JCup;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
 
 public class ArchiveExtractor {
-    private static final FastLogger LOGGER = Main.LOGGER.createChild("ArchiveExtractor");
+    private static final FastLogger LOGGER = JCup.LOGGER.createChild("ArchiveExtractor");
 
     public static void extract(Archives.Format format, File archiveFile, File destDir) throws FileNotFoundException, IOException {
         destDir.mkdirs();

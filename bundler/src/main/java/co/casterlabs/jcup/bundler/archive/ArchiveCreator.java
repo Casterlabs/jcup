@@ -16,11 +16,11 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 
 import co.casterlabs.commons.platform.OSFamily;
 import co.casterlabs.commons.platform.Platform;
-import co.casterlabs.jcup.bundler.Main;
+import co.casterlabs.jcup.bundler.JCup;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
 
 public class ArchiveCreator {
-    private static final FastLogger LOGGER = Main.LOGGER.createChild("ArchiveCreator");
+    private static final FastLogger LOGGER = JCup.LOGGER.createChild("ArchiveCreator");
 
     public static void create(Archives.Format format, File inputDir, File destFile) throws FileNotFoundException, IOException {
         switch (format) {

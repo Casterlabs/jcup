@@ -1,12 +1,12 @@
 package co.casterlabs.jcup.bundler;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpClient.Redirect;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Path;
 import java.util.Map;
 
 import co.casterlabs.jcup.bundler.config.Architecture;
@@ -18,7 +18,7 @@ import co.casterlabs.rakurai.json.element.JsonObject;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
 
 public class Adoptium {
-    private static final FastLogger LOGGER = Main.LOGGER.createChild("AdoptiumDownloader");
+    private static final FastLogger LOGGER = JCup.LOGGER.createChild("AdoptiumDownloader");
 
     private static final HttpClient httpClient = HttpClient
         .newBuilder()
@@ -40,7 +40,7 @@ public class Adoptium {
         OperatingSystem.windows, "windows"
     );
 
-    public static Path download(Path folder, int version, Architecture arch, OperatingSystem os) throws IOException, InterruptedException {
+    public static File download(int version, Architecture arch, OperatingSystem os) throws IOException, InterruptedException {
         LOGGER.info("Looking for build (%d:%s:%s)", version, arch, os);
         JsonArray json = Rson.DEFAULT.fromJson(
             httpClient.send(
@@ -79,25 +79,24 @@ public class Adoptium {
             throw new IllegalArgumentException("Unable to find download for " + version + ":" + arch + ":" + os);
         }
 
-        Path binaryPath = folder.resolve(binaryName);
-        LOGGER.debug("Url: %s, Path: %s", binaryUrl, binaryPath);
+        File binaryArchive = new File(JCup.DOWNLOAD_CACHE_FOLDER, binaryName);
+        LOGGER.debug("Url: %s, Path: %s", binaryUrl, binaryArchive);
 
-        if (binaryPath.toFile().exists()) {
+        if (binaryArchive.exists()) {
             LOGGER.info("This JRE build is cached. Using that instead.");
         } else {
             LOGGER.info("Found a link. Downloading...");
 
-            folder.toFile().mkdirs();
             httpClient.send(
                 HttpRequest.newBuilder()
                     .uri(URI.create(binaryUrl))
                     .GET()
                     .build(),
-                HttpResponse.BodyHandlers.ofFile(binaryPath)
+                HttpResponse.BodyHandlers.ofFile(binaryArchive.toPath())
             );
             LOGGER.info("Finished downloading...");
         }
-        return binaryPath;
+        return binaryArchive;
     }
 
 }

@@ -8,8 +8,8 @@ import lombok.AllArgsConstructor;
 
 public class Archives {
 
-    public static @Nullable Format probeFormat(String location) {
-        String pathname = new File(location)
+    public static @Nullable Format probeFormat(File file) {
+        String pathname = file
             .getPath()
             .toLowerCase();
 
