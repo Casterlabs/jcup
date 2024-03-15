@@ -19,6 +19,7 @@ import co.casterlabs.jcup.bundler.config.Architecture;
 import co.casterlabs.jcup.bundler.config.Config;
 import co.casterlabs.jcup.bundler.config.Config.OSSpecificConfig;
 import co.casterlabs.jcup.bundler.config.OperatingSystem;
+import co.casterlabs.jcup.bundler.icons.AppIcon;
 import co.casterlabs.rakurai.json.Rson;
 import lombok.Getter;
 import picocli.CommandLine;
@@ -135,6 +136,15 @@ public class Main implements Runnable {
         Utils.deleteRecursively(new File("jcup/artifacts"));
         new File("jcup/artifacts").mkdirs();
 
+        AppIcon icon = null;
+        if (config.appIconPath != null) {
+            try {
+                icon = AppIcon.from(new File(config.appIconPath));
+            } catch (IOException e) {
+                LOGGER.warn("Unable to read app icon, ignoring.\n%s", e);
+            }
+        }
+
         for (OSSpecificConfig ossc : config.toCreate) {
             for (OperatingSystem os : ossc.operatingSystems) {
                 for (Architecture arch : ossc.architectures) {
@@ -240,6 +250,17 @@ public class Main implements Runnable {
                                 return;
                             }
 
+                            if (icon != null) {
+                                try {
+                                    Files.write(
+                                        new File(buildFolder, config.executableName + ".png").toPath(),
+                                        icon.toPng()
+                                    );
+                                } catch (IOException e) {
+                                    LOGGER.warn("Unable to write image icon, ignoring.\n%s", e);
+                                }
+                            }
+
                             // Mark files as executable.
                             final String[] NEED_TO_MARK_EXEC = {
                                     config.executableName,
@@ -327,6 +348,17 @@ public class Main implements Runnable {
                                 return;
                             }
 
+                            if (icon != null) {
+                                try {
+                                    Files.write(
+                                        new File(buildFolder, "icon.icns").toPath(),
+                                        icon.toIcns()
+                                    );
+                                } catch (IOException e) {
+                                    LOGGER.warn("Unable to write image icon, ignoring.\n%s", e);
+                                }
+                            }
+
                             // Mark files as executable.
                             final String[] NEED_TO_MARK_EXEC = {
                                     "Contents/MacOS/" + config.executableName,
@@ -373,6 +405,17 @@ public class Main implements Runnable {
                                 LOGGER.fatal("Unable to copy native executable, aborting.\n%s", e);
                                 System.exit(EXIT_CODE_ERROR);
                                 return;
+                            }
+
+                            if (icon != null) {
+                                try {
+                                    Files.write(
+                                        new File(buildFolder, config.executableName + ".ico").toPath(),
+                                        icon.toIco()
+                                    );
+                                } catch (IOException e) {
+                                    LOGGER.warn("Unable to write image icon, ignoring.\n%s", e);
+                                }
                             }
 
                             try {

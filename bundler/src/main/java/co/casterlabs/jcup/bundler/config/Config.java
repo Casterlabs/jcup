@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 public class Config {
     public String executableName = "MyApp";
     public String executableId = "co.casterlabs.jcup.example_app";
-    public String appIconPath = null;
+    public String appIconPath = "jcup-example-app.png";
 
     public String vmArgs = "-Xms1M -jar jcup-example-app.jar";
     public int javaVersion = 17;
