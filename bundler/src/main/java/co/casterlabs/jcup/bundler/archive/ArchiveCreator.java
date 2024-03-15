@@ -14,6 +14,8 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 
+import co.casterlabs.commons.platform.OSFamily;
+import co.casterlabs.commons.platform.Platform;
 import co.casterlabs.jcup.bundler.Main;
 import xyz.e3ndr.fastloggingframework.logging.FastLogger;
 
@@ -34,26 +36,22 @@ public class ArchiveCreator {
 
             case TAR_GZ: {
                 try {
-                    int exitCode = Runtime.getRuntime().exec(new String[] {
-                            "tar",
-                            "-czvf",
-                            destFile.getAbsolutePath(),
-                            "-C",
-                            inputDir.getAbsolutePath(),
-                            "."
-                    })
-                        .waitFor();
+                    if (Platform.osFamily == OSFamily.UNIX) {
+                        int exitCode = Runtime.getRuntime().exec(new String[] {
+                                "tar",
+                                "-czvf",
+                                destFile.getAbsolutePath(),
+                                "-C",
+                                inputDir.getAbsolutePath(),
+                                "."
+                        })
+                            .waitFor();
 
-                    if (exitCode != 0) {
-                        LOGGER.warn("tar command appears to be unsupported, falling back to java-implementation. THIS WILL DESTROY THE EXECUTABLE BIT.");
-                        try (
-                            OutputStream fileOut = new FileOutputStream(destFile);
-                            OutputStream gzipOut = new GzipCompressorOutputStream(fileOut);
-                            TarArchiveOutputStream out = new TarArchiveOutputStream(gzipOut)) {
-                            out.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
-                            compress(inputDir, inputDir, out);
-                            out.finish();
+                        if (exitCode != 0) {
+                            fallbackTarBehavior(inputDir, destFile);
                         }
+                    } else {
+                        fallbackTarBehavior(inputDir, destFile);
                     }
                 } catch (InterruptedException e) {
                     throw new IOException(e);
@@ -64,6 +62,18 @@ public class ArchiveCreator {
 
             default:
                 throw new IOException("Unsupported compression format: " + format);
+        }
+    }
+
+    private static void fallbackTarBehavior(File inputDir, File destFile) throws FileNotFoundException, IOException {
+        LOGGER.warn("tar command appears to be unsupported, falling back to java-implementation. THIS WILL DESTROY THE EXECUTABLE BIT.");
+        try (
+            OutputStream fileOut = new FileOutputStream(destFile);
+            OutputStream gzipOut = new GzipCompressorOutputStream(fileOut);
+            TarArchiveOutputStream out = new TarArchiveOutputStream(gzipOut)) {
+            out.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+            compress(inputDir, inputDir, out);
+            out.finish();
         }
     }
 
