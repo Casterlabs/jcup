@@ -15,3 +15,4 @@
 # Common
 *target/
 *.versionsBackup
+bundler/jcup-example-app.png
