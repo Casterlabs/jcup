@@ -28,6 +28,7 @@ public class JCup {
 
     public static File createBuildFolder(@NonNull OperatingSystem os, @NonNull Architecture arch) {
         File folder = new File(BUILD_FOLDER, String.format("%s-%s", os, arch));
+        Utils.deleteRecursively(folder); // Clear it up.
         folder.mkdirs();
         return folder;
     }

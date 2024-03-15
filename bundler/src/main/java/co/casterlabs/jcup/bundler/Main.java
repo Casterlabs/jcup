@@ -3,7 +3,6 @@ package co.casterlabs.jcup.bundler;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.Path;
 
 import co.casterlabs.jcup.bundler.config.Architecture;
 import co.casterlabs.jcup.bundler.config.Config;
@@ -40,12 +39,6 @@ public class Main implements Runnable {
     }, description = "Disables colored output.")
     private boolean disableColor = false;
 
-    @Option(names = {
-            "-c",
-            "--config"
-    }, description = "Allows you to specify a config file path")
-    private String configPath = "jcup/config.json";
-
     public static void main(String[] args) throws Exception {
         new CommandLine(new Main()).execute(args); // Calls #run()
     }
@@ -68,22 +61,22 @@ public class Main implements Runnable {
             JCup.LOGGER.debug("Enabled debug logging.");
         }
 
-        Path configFile = Path.of(this.configPath);
-        if (!configFile.toFile().exists()) {
+        File configFile = new File(JCup.BASE_FOLDER, "config.json");
+        if (!configFile.exists()) {
             try {
                 // Config file doesn't exist. Write out some defaults.
-                configFile.toFile().getParentFile().mkdirs();
+                configFile.getParentFile().mkdirs();
                 Files.writeString(
-                    configFile,
+                    configFile.toPath(),
                     Rson.DEFAULT.toJson(new Config()).toString(true)
                 );
                 Files.writeString(
-                    configFile.resolveSibling(".gitignore"),
+                    configFile.toPath().resolveSibling(".gitignore"),
                     "*\n"
                         + "!.gitignore\n"
                         + "!config.json\n"
                 );
-                JCup.LOGGER.info("Wrote config defaults. Edit %s and re-run this tool.", configFile.toAbsolutePath());
+                JCup.LOGGER.info("Wrote config defaults. Edit %s and re-run this tool.", configFile.getAbsolutePath());
                 System.exit(JCup.EXIT_CODE_OTHER);
                 return;
             } catch (IOException e) {
@@ -96,7 +89,7 @@ public class Main implements Runnable {
         // Read-in the config.
         Config config;
         try {
-            config = Rson.DEFAULT.fromJson(Files.readString(configFile), Config.class);
+            config = Rson.DEFAULT.fromJson(Files.readString(configFile.toPath()), Config.class);
         } catch (IOException e) {
             JCup.LOGGER.severe("Unable to read config. Do we have permission to read?\n%s", e);
             System.exit(JCup.EXIT_CODE_ERROR);
@@ -106,19 +99,13 @@ public class Main implements Runnable {
         try {
             // Update the config.json with any new values/defaults.
             Files.writeString(
-                configFile,
+                configFile.toPath(),
                 Rson.DEFAULT.toJson(config).toString(true)
             );
             JCup.LOGGER.debug("Rewrote config with any missing parameters.");
         } catch (IOException e) {
             JCup.LOGGER.warn("Unable to rewrite config. Do we have permission to write? Ignoring.\n%s", e);
         }
-
-        // Empty these out.
-        Utils.deleteRecursively(new File("jcup/build"));
-        new File("jcup/build").mkdirs();
-        Utils.deleteRecursively(new File("jcup/artifacts"));
-        new File("jcup/artifacts").mkdirs();
 
         AppIcon icon = null;
         if (config.appIconPath != null) {
