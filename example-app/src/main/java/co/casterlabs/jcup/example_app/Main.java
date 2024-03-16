@@ -7,6 +7,7 @@ import java.awt.Font;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.Arrays;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -18,6 +19,8 @@ import javax.swing.UIManager;
 public class Main {
 
     public static void main(String[] args) {
+        System.out.println(Arrays.toString(args));
+
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); // Set the look and feel to system default
         } catch (Exception ignored) {}
@@ -39,6 +42,7 @@ public class Main {
             @Override
             public void actionPerformed(ActionEvent e) {
                 Toolkit.getDefaultToolkit().beep();
+                System.out.println("Bell!");
             }
         });
         buttonPanel.add(button);
