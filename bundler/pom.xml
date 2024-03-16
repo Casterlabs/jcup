@@ -85,6 +85,12 @@
 		</dependency> <!-- For Eclipse users -->
 
 		<dependency>
+			<groupId>com.kichik.pecoff4j</groupId>
+			<artifactId>pecoff4j</artifactId>
+			<version>0.4.1</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-imaging</artifactId>
 			<version>1.0-alpha3</version>

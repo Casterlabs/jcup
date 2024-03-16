@@ -6,9 +6,25 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map.Entry;
 
 import org.jetbrains.annotations.Nullable;
+
+import com.kichik.pecoff4j.PE;
+import com.kichik.pecoff4j.ResourceDirectory;
+import com.kichik.pecoff4j.ResourceDirectoryTable;
+import com.kichik.pecoff4j.ResourceEntry;
+import com.kichik.pecoff4j.constant.ResourceType;
+import com.kichik.pecoff4j.io.DataReader;
+import com.kichik.pecoff4j.io.DataWriter;
+import com.kichik.pecoff4j.io.PEParser;
+import com.kichik.pecoff4j.resources.GroupIconDirectory;
+import com.kichik.pecoff4j.resources.GroupIconDirectoryEntry;
+import com.kichik.pecoff4j.resources.IconImage;
+import com.kichik.pecoff4j.util.IconFile;
+import com.kichik.pecoff4j.util.PaddingType;
 
 import co.casterlabs.jcup.bundler.Adoptium;
 import co.casterlabs.jcup.bundler.JCup;
@@ -30,6 +46,7 @@ class WindowsBundler implements Bundler {
     static final Bundler INSTANCE = new WindowsBundler();
     private static final FastLogger LOGGER = Bundler.LOGGER.createChild("Windows");
 
+    @SuppressWarnings("deprecation")
     @Override
     public void bundle(@NonNull Config config, @Nullable AppIcon icon, @NonNull OSSpecificConfig ossc, @NonNull Architecture arch) throws JCupAbortException {
         File buildFolder = JCup.createBuildFolder(OperatingSystem.windows, arch);
@@ -111,8 +128,9 @@ class WindowsBundler implements Bundler {
         }
 
         // Add the launcher exe.
+        File executableFile = new File(buildFolder, config.executableName + ".exe");
         try (InputStream in = JCup.class.getResourceAsStream("/windows-launcher.exe");
-            OutputStream out = new FileOutputStream(new File(buildFolder, config.executableName + ".exe"))) {
+            OutputStream out = new FileOutputStream(executableFile)) {
             in.transferTo(out);
         } catch (IOException e) {
             LOGGER.fatal("Unable to copy native executable, aborting.\n%s", e);
@@ -123,10 +141,40 @@ class WindowsBundler implements Bundler {
         // TODO modify the .exe with this icon instead.
         if (icon != null) {
             try {
-                Files.write(
-                    new File(buildFolder, config.executableName + ".ico").toPath(),
-                    icon.toIco()
+                // https://github.com/kichik/pecoff4j/blob/master/src/test/java/com/kichik/pecoff4j/ResourceDirectoryTest.java
+                PE pe = PEParser.parse(executableFile);
+
+                ResourceDirectory directory = pe.getImageData().getResourceTable();
+
+                // add icon from ico file
+                IconFile iconFile = IconFile.read(new DataReader(icon.toIco()));
+                List<ResourceEntry> iconEntries = new ArrayList<>();
+                for (IconImage iconImage : iconFile.getImages()) {
+                    iconEntries.add(
+                        entry(
+                            iconEntries.size() + 1,
+                            directory(entry(2057, iconImage.toByteArray()))
+                        )
+                    );
+                }
+                directory.getEntries().add(
+                    entry(
+                        ResourceType.ICON,
+                        directory(iconEntries.toArray(new ResourceEntry[0]))
+                    )
                 );
+
+                // add icon directory
+                byte[] iconDirData = createIconDirectory(iconFile.getImages()).toByteArray();
+                directory.getEntries().add(
+                    entry(
+                        ResourceType.GROUP_ICON,
+                        directory(entry(1, directory(entry(2057, iconDirData))))
+                    )
+                );
+
+                pe.rebuild(PaddingType.PATTERN);
+                pe.write(new DataWriter(executableFile));
             } catch (IOException e) {
                 LOGGER.warn("Unable to write image icon, ignoring.\n%s", e);
             }
@@ -146,4 +194,51 @@ class WindowsBundler implements Bundler {
         LOGGER.info("Done!");
     }
 
+    private GroupIconDirectory createIconDirectory(IconImage[] icons) {
+        GroupIconDirectory directory = new GroupIconDirectory();
+        directory.setReserved(0);
+        directory.setType(1);
+
+        int id = 1;
+        for (IconImage icon : icons) {
+            GroupIconDirectoryEntry entry = new GroupIconDirectoryEntry();
+            entry.setWidth(icon.getHeader() != null ? icon.getHeader().getWidth() : 0);
+            entry.setHeight(icon.getHeader() != null ? icon.getHeader().getHeight() / 2 : 0);
+            entry.setColorCount(0);
+            entry.setReserved(0);
+            entry.setPlanes(icon.getHeader() != null ? icon.getHeader().getPlanes() : 1);
+            entry.setBitCount(icon.getHeader() != null ? icon.getHeader().getBitCount() : 32);
+            entry.setBytesInRes(icon.sizeOf());
+            entry.setId(id++);
+            directory.getEntries().add(entry);
+        }
+
+        return directory;
+    }
+
+    private ResourceEntry entry(int id, ResourceDirectory directory) {
+        ResourceEntry entry = new ResourceEntry();
+        entry.setId(id);
+        entry.setDirectory(directory);
+        return entry;
+    }
+
+    private ResourceEntry entry(int id, byte[] data) {
+        ResourceEntry entry = new ResourceEntry();
+        entry.setId(id);
+        entry.setCodePage(1252);
+        entry.setData(data);
+        return entry;
+    }
+
+    private ResourceDirectory directory(ResourceEntry... entries) {
+        ResourceDirectory dir = new ResourceDirectory();
+        ResourceDirectoryTable table = new ResourceDirectoryTable();
+        table.setMajorVersion(4);
+        dir.setTable(table);
+        for (ResourceEntry entry : entries) {
+            dir.getEntries().add(entry);
+        }
+        return dir;
+    }
 }
