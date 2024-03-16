@@ -7,7 +7,7 @@
 
 #pragma comment(lib, "SHELL32.LIB")
 
-int RunCommand(char *module, char *to_execute)
+int RunCommand(char *module, char *to_execute, boolean discardConsole)
 {
     // Create a job object
     HANDLE hJob = CreateJobObject(NULL, NULL);
@@ -31,10 +31,17 @@ int RunCommand(char *module, char *to_execute)
     STARTUPINFO si;
     ZeroMemory(&si, sizeof(si));
     si.cb = sizeof(si);
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-    si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-    si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
-    // si.dwFlags |= STARTF_USESTDHANDLES;
+    if (discardConsole)
+    {
+        si.dwFlags = STARTF_USESHOWWINDOW;
+        si.wShowWindow = SW_HIDE; // Hide the window of the child process
+    }
+    else
+    {
+        si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+        si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+        si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+    }
 
     PROCESS_INFORMATION pi;
     ZeroMemory(&pi, sizeof(pi));
@@ -81,8 +88,46 @@ int RunCommand(char *module, char *to_execute)
     return exit_code;
 }
 
-int main(int argc, char **argv)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow)
 {
+    boolean hasConsole = AttachConsole(ATTACH_PARENT_PROCESS);
+    if (hasConsole)
+    {
+        freopen("CONIN$", "r", stdin);
+        freopen("CONOUT$", "w", stdout);
+        freopen("CONOUT$", "w", stderr);
+    }
+
+    // CWD to the executable path.
+    {
+        char path[MAX_PATH];
+        DWORD length = GetModuleFileName(NULL, path, MAX_PATH);
+        if (length == 0)
+        {
+            printf("Error getting the path of the executable.\n");
+            return 1;
+        }
+
+        // Extract directory part of the path
+        char *last_backslash = strrchr(path, '\\');
+        if (last_backslash != NULL)
+        {
+            *last_backslash = '\0'; // Null-terminate to get the directory path
+        }
+        else
+        {
+            fprintf(stderr, "No directory part found in path, exiting.\n");
+            return 1;
+        }
+
+        // Change the current working directory
+        if (!SetCurrentDirectory(path))
+        {
+            fprintf(stderr, "Error changing the CWD, exiting.\n");
+            return 1;
+        }
+    }
+
     str_builder_t *command = str_builder_create();
 
     str_builder_add_str(command, "runtime/bin/java.exe", 0);
@@ -106,24 +151,12 @@ int main(int argc, char **argv)
         fclose(fp);
     }
 
-    // Grab the raw arguments, unparsed.
-    {
-        char *this_executable = argv[0];
-        char *raw_command_line = GetCommandLine();
-        char *this_command_line = calloc(strlen(raw_command_line), 1);
-        memcpy( // Skip over the executable name.
-            this_command_line,
-            &raw_command_line[strlen(this_executable)],
-            strlen(raw_command_line) - strlen(this_executable));
-
-        str_builder_add_str(command, this_command_line, 0);
-        free(raw_command_line);
-        free(this_command_line);
-    }
+    str_builder_add_char(command, ' ');
+    str_builder_add_str(command, lpCmdLine, 0);
 
     char *to_execute = str_builder_dump(command, NULL);
     str_builder_destroy(command); // Free that memory.
 
-    long long exit_code = RunCommand(NULL, to_execute);
+    long long exit_code = RunCommand(NULL, to_execute, !hasConsole);
     return exit_code;
 }
