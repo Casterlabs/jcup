@@ -111,7 +111,7 @@ class WindowsBundler implements Bundler {
         }
 
         // Add the launcher exe.
-        try (InputStream in = JCup.class.getResourceAsStream("/windows-launcher.exe");
+        try (InputStream in = JCup.class.getResourceAsStream(arch == Architecture.x86 ? "/windows-launcher-x86.exe" : "/windows-launcher-x86_64.exe");
             OutputStream out = new FileOutputStream(new File(buildFolder, config.executableName + ".exe"))) {
             in.transferTo(out);
         } catch (IOException e) {
