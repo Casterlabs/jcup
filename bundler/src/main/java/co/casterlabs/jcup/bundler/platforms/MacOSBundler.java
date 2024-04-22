@@ -107,12 +107,13 @@ class MacOSBundler implements Bundler {
 
         // Create the VM args file.
         try {
-            String vmArgs = config.vmArgs;
-            if (ossc.extraVmArgs != null && !ossc.extraVmArgs.isEmpty()) {
-                vmArgs += ' ';
-                vmArgs += ossc.extraVmArgs;
+            String vmArgs;
+            if (ossc.extraVmArgs == null || ossc.extraVmArgs.isEmpty()) {
+                vmArgs = config.vmArgs;
+            } else {
+                vmArgs = ossc.extraVmArgs + ' ' + config.vmArgs;
             }
-            Files.writeString(new File(buildFolder, "Contents/Resources/vmargs.txt").toPath(), vmArgs);
+            Files.writeString(new File(buildFolder, "vmargs.txt").toPath(), vmArgs);
         } catch (IOException e) {
             LOGGER.fatal("Unable to write vmargs.txt, aborting.\n%s", e);
             throw new JCupAbortException(JCup.EXIT_CODE_ERROR);
