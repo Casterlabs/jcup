@@ -113,7 +113,7 @@ class MacOSBundler implements Bundler {
             } else {
                 vmArgs = ossc.extraVmArgs + ' ' + config.vmArgs;
             }
-            Files.writeString(new File(buildFolder, "vmargs.txt").toPath(), vmArgs);
+            Files.writeString(new File(buildFolder, "Contents/Resources/vmargs.txt").toPath(), vmArgs);
         } catch (IOException e) {
             LOGGER.fatal("Unable to write vmargs.txt, aborting.\n%s", e);
             throw new JCupAbortException(JCup.EXIT_CODE_ERROR);
