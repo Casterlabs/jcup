@@ -77,7 +77,7 @@ public class ArchiveCreator {
         }
     }
 
-    private static void compress(File inputDir, File file, ArchiveOutputStream out) throws IOException, FileNotFoundException {
+    private static <E extends ArchiveEntry> void compress(File inputDir, File file, ArchiveOutputStream<E> out) throws IOException, FileNotFoundException {
         if (file.isDirectory()) {
             for (File sub : file.listFiles()) {
                 compress(inputDir, sub, out);
@@ -88,7 +88,7 @@ public class ArchiveCreator {
         String entryPath = file.getAbsolutePath().substring(inputDir.getAbsolutePath().length() + 1);
         LOGGER.trace("Compressing: %s", entryPath);
 
-        ArchiveEntry entry = out.createArchiveEntry(file, entryPath);
+        E entry = out.createArchiveEntry(file, entryPath);
         out.putArchiveEntry(entry);
         try (InputStream in = new FileInputStream(file)) {
             in.transferTo(out);

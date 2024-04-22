@@ -23,6 +23,7 @@ import xyz.e3ndr.fastloggingframework.logging.FastLogger;
 public class ArchiveExtractor {
     private static final FastLogger LOGGER = JCup.LOGGER.createChild("ArchiveExtractor");
 
+    @SuppressWarnings("deprecation")
     public static void extract(Archives.Format format, File archiveFile, File destDir) throws FileNotFoundException, IOException {
         destDir.mkdirs();
 
