@@ -1,92 +1,10 @@
-// All this file does is immediately call a sister bat file with the same input arguments.
-
 #include <windows.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "str_builder.h"
 
 #pragma comment(lib, "SHELL32.LIB")
-
-int RunCommand(char *module, char *to_execute, boolean discardConsole)
-{
-    // Create a job object
-    HANDLE hJob = CreateJobObject(NULL, NULL);
-    if (hJob == NULL)
-    {
-        fprintf(stderr, "Error creating job object\n");
-        return 1;
-    }
-
-    // Assign the job to the current process
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION ji;
-    ZeroMemory(&ji, sizeof(ji));
-    ji.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    if (!SetInformationJobObject(hJob, JobObjectExtendedLimitInformation, &ji, sizeof(ji)))
-    {
-        fprintf(stderr, "Error setting job object information\n");
-        CloseHandle(hJob);
-        return 1;
-    }
-
-    STARTUPINFO si;
-    ZeroMemory(&si, sizeof(si));
-    si.cb = sizeof(si);
-    // if (discardConsole)
-    // {
-    //     si.dwFlags = STARTF_USESHOWWINDOW;
-    //     si.wShowWindow = SW_HIDE; // Hide the window of the child process
-    // }
-    // else
-    // {
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-    si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-    si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
-    // }
-
-    PROCESS_INFORMATION pi;
-    ZeroMemory(&pi, sizeof(pi));
-
-    // Start the child process.
-    if (!CreateProcess(
-            module,           // Can use CMD, otherwise nullptr.
-            to_execute,       // Command line
-            NULL,             // Process handle not inheritable
-            NULL,             // Thread handle not inheritable
-            FALSE,            // Set handle inheritance to FALSE
-            CREATE_NO_WINDOW, //
-            NULL,             // Use parent's environment block
-            NULL,             // Use parent's starting directory
-            &si,              // Pointer to STARTUPINFO structure
-            &pi               // Pointer to PROCESS_INFORMATION structure
-            ))
-    {
-        fprintf(stderr, "CreateProcess failed (%d).\n", GetLastError());
-        return -1;
-    }
-
-    // Assign the child process to the job
-    if (!AssignProcessToJobObject(hJob, pi.hProcess))
-    {
-        fprintf(stderr, "Error assigning process to job object\n");
-        CloseHandle(pi.hProcess); // Go ahead and kill the process.
-        CloseHandle(hJob);
-        return -1;
-    }
-
-    // Wait for the process to exit normally.
-    WaitForSingleObject(pi.hProcess, INFINITE);
-
-    // Get the exit code.
-    DWORD exit_code = 0;
-    GetExitCodeProcess(pi.hProcess, &exit_code);
-
-    // Cleanup.
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-    CloseHandle(hJob);
-
-    return exit_code;
-}
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow)
 {
@@ -130,7 +48,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
 
     str_builder_t *command = str_builder_create();
 
-    str_builder_add_str(command, "runtime/bin/java.exe", 0);
+    str_builder_add_str(command, "runtime\\bin\\java.exe", 0);
 
     // Look for a vmargs.txt, if it exists then append it to the string builder.
     {
@@ -157,6 +75,54 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
     char *to_execute = str_builder_dump(command, NULL);
     str_builder_destroy(command); // Free that memory.
 
-    long long exit_code = RunCommand(NULL, to_execute, !hasConsole);
-    return exit_code;
+    STARTUPINFO si;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+
+    // Redirect stdout to the current process' stdout
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+    si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+
+    // Start the child process in a new process group
+    si.dwFlags |= STARTF_FORCEOFFFEEDBACK;
+
+    // Create the child process in a new process group
+    DWORD dwCreationFlags = CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW;
+
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&pi, sizeof(pi));
+
+    // Start the child process.
+    if (!CreateProcess(
+            NULL,            // No module name (use command line)
+            to_execute,      // Command line
+            NULL,            // Process handle not inheritable
+            NULL,            // Thread handle not inheritable
+            FALSE,           // Set handle inheritance to FALSE
+            dwCreationFlags, // No creation flags
+            NULL,            // Use parent's environment block
+            NULL,            // Use parent's starting directory
+            &si,             // Pointer to STARTUPINFO structure
+            &pi              // Pointer to PROCESS_INFORMATION structure
+            ))
+    {
+        fprintf(stderr, "CreateProcess failed (%lu).\n", GetLastError());
+        return -1;
+    }
+
+    // Wait until child process exits.
+    // WaitForSingleObject(pi.hProcess, INFINITE);
+
+    // // Get the exit code.
+    // DWORD exit_code = 0;
+    // GetExitCodeProcess(pi.hProcess, &exit_code);
+
+    // // Close process and thread handles.
+    // CloseHandle(pi.hProcess);
+    // CloseHandle(pi.hThread);
+
+    // return exit_code;
+    return 0;
 }
